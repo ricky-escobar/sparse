@@ -1,33 +1,14 @@
 #lang racket
 
-(require (for-syntax syntax/parse)
-         (for-syntax racket/base))
-
-(define-syntax (define/memo stx)
-  (syntax-parse stx
-    [(_ (name:id arg1:id)
-        body:expr ...)
-     #`(define name
-         (let ()
-           (define the-hash (make-hash))
-           (lambda (arg1)
-             (define hash-key arg1)
-             (define hash-lookup (hash-ref the-hash hash-key #f))
-             (cond [(not hash-lookup)
-                    (define result (let () body ...))
-                    (hash-set! the-hash hash-key result)
-                    result]
-                   [else hash-lookup]))))]))
-
 (struct rho (e) #:transparent)
 
-(define/memo (parse-rho r)
+(define (parse-rho r)
   (match r
     [(list 'ρ rest) (rho (parse-rho rest))]
     [(? list? l) (map parse-rho l)]
     [else r]))
 
-(define/memo (rho->sexp r)
+(define (rho->sexp r)
   (match r
     [(rho e) (rho->sexp e)]
     [(? list? l) (map rho->sexp l)]
