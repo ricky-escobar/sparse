@@ -8,6 +8,8 @@
 (define test-grammar
   ;; These top-level functions shouldn't be forbidden; so use them explicitly
   `([true false + - * / eq? <= substring]
+    ;; Invalid ids
+    [lam new send = var rec if]
     ;; Call the recursive rule `expr`
     [expr
      {if expr expr expr}
@@ -23,17 +25,18 @@
      ;; but isn't a valid param name.
      [id this]
      ;; Some example strings to use
-     [U "Hello" "World" ""]
+     [string "Hello" "World" ""]
      ;; Some example numbers to use
-     [U 0 1 -1 2.2 -22/7]]))
+     [number 0 1 -1 2.2 -22/7]]))
 
 ;; Parses a grammar specification like the one above into the form expected by
-;; generate-testcase. `s` should be a list with two elements. The first is a
-;; list of identifiers to explicitly add to the testcase. The second is the
-;; actual grammar. The first element of the actual grammar is the name of the
-;; recursive rule, e.g., `expr`. The rest are the rules of the grammar.
-;; The form [id ids ...] is special and denotes an identifier with addition ids
-;; to use.
+;; generate-testcase. `s` should be a list with three elements. The first is a
+;; list of identifiers to explicitly add to the testcase. The second is forbidden
+;; identifiers. The third is the actual grammar. The first element of
+;; the actual grammar is the name of the recursive rule, e.g., `expr`.
+;; The rest are the rules of the grammar.
+;; The forms [id ids ...], [number nums ...], [string strings ...] are specia
+;; and denote an identifier/number/string with explicit examples to use.
 ;; The form [U literals ...] is also special and denotes a literal with
 ;; mutliple examples.
 ;; Placing a literal ... after a term denotes a variadic list.
@@ -41,8 +44,8 @@
 ;; is treated as a literal in the grammar.
 (define (parse-grammar-spec s)
   (match s
-    [(list ids (list (? symbol? expr) rules ...))
-     (map (parse-rule expr ids) (map desugar-... rules))]))
+    [(list ids bad-ids (list (? symbol? expr) rules ...))
+     (map (parse-rule expr ids bad-ids) (map desugar-... rules))]))
 
 ;; Moves a variadic pair `term ...` into a list (... term) to make parsing easier
 (define (desugar-... rule)
@@ -56,33 +59,21 @@
     [else rule]))
 
 ;; Parses a rule into the Rule<%> form of generator.rkt
-(define ((parse-rule expr ids) rule)
+(define ((parse-rule expr ids bad-ids) rule)
   (match rule
     [(? (λ (s) (equal? s expr)))
      (new Recursive%)]
     [(list '... term)
-     (new Variadic% [repeated-term ((parse-rule expr ids) term)])]
+     (new Variadic% [repeated-term ((parse-rule expr ids bad-ids) term)])]
     [(list 'U terms ...)
-     (new Literal% [the-examples terms])]
+     (new Literal% [the-examples terms] [bad-examples bad-ids] [predicate (λ (x) true)])]
     [(list 'id other-ids ...)
-     (new Identifier% [ids (append other-ids ids)])]
+     (new Identifier% [ids (append other-ids ids)] [bad-ids bad-ids])]
+    [(list 'number terms ...)
+     (new Literal% [the-examples terms] [bad-examples bad-ids] [predicate real?])]
+    [(list 'string terms ...)
+     (new Literal% [the-examples terms] [bad-examples bad-ids] [predicate string?])]
     [(list subterms ...)
-     (new List% [subterms (map (parse-rule expr ids) subterms)])]
+     (new List% [subterms (map (parse-rule expr ids bad-ids) subterms)])]
     [sym
-     (new Literal% [the-examples (list sym)])]))
-
-(define desugared-testcase
-  '(expr
-    (if expr expr expr)
-    (expr (... expr))
-    (with (... ((id) = expr)) expr)
-    (lam ((... (id))) expr)
-    (new (id) (... expr))
-    (send expr expr (... expr))
-    (rec ((id) = expr) expr)
-    (id this)
-    (U "Hello" "World" "")
-    (U 0 1 -1 2.2 -22/7)))
-
-(check-exn exn:fail? (λ () (desugar-... '(x y ... (... x) z))))
-(check-equal? (desugar-... (second test-grammar)) desugared-testcase)
+     (new Literal% [the-examples (list sym)] [bad-examples (remove sym bad-ids)] [predicate (λ (x) (equal? x sym))])]))

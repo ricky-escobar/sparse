@@ -19,13 +19,6 @@
     (with-handlers ([exn:fail? (λ (e) #f)]) (parse (preprocess s)) #t))
   (remove-duplicates (map rho->sexp (map (trim-bottom wrapped-parse 1) ((trim-top wrapped-parse) testcase)))))
 
-;; Removes all those pesky rhos since the students don't expect them
-(define (rho->sexp r)
-  (match r
-    [(rho e) (rho->sexp e)]
-    [(? list? l) (map rho->sexp l)]
-    [else r]))
-
 ;; Returns terms for which `func` returns false, but `func` on each subterm
 ;; returns true.
 (define ((trim-top func) r)

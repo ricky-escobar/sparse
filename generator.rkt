@@ -6,7 +6,7 @@
 ;; Maybe I could have just used `values` somehow?
 (struct v (l) #:transparent)
 
-(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase rho)
+(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase generate-bad-testcases rho rho->sexp)
 
 ;; The main function of this module. Takes in a list of Rule<%>s and
 ;; produces an expression that matches the grammar described by the rules
@@ -19,6 +19,28 @@
 (define (generate-testcase rules)
   (set-rules rules)
   (splice-v (rho (send (first rules) get-usage #t))))
+
+;; Removes all those pesky rhos since the students don't expect them
+;; (rho -> Sexp)
+(define (rho->sexp r)
+  (match r
+    [(rho e) (rho->sexp e)]
+    [(? list? l) (map rho->sexp l)]
+    [else r]))
+
+;; Generates a list of expressions which do not conform to the grammar
+;; specified by `rules`. In contrast to generate-testcase, which produces
+;; one big valid expressions, this produces many small invalid expressions.
+;; ((Listof Rule<%>) -> (Listof Sexp)
+(define (generate-bad-testcases rules)
+  (set-rules rules)
+  (filter (λ (sexp) (not (ormap (λ (rule) (send rule list-matches? (list sexp))) rules)))
+          (dedupe (map rho->sexp
+                       (map splice-v
+                            (map rho
+                                 (append-map (λ (rule) (send rule get-bad-usages))
+                                             rules))))
+                  empty)))
 
 ;; The main interface which represents a single line in the EBNF-like grammar.
 (define Rule<%>
@@ -45,6 +67,21 @@
     ;; (-> Boolean)
     is-used?
 
+    ;; Returns a simple usage of the rule. This is simple in the sense that
+    ;; any recursive (sub)rules will immediately produce terminals.
+    ;; (-> rho)
+    get-simple-usage
+
+    ;; Returns a list of expressions which do not conform to this rule.
+    ;; Note that the expression may still match some other rule.
+    ;; (-> (Listof rho))
+    get-bad-usages
+
+    ;; Determines whether the contents of the list could have been produced
+    ;; by this rule.
+    ;; ((Listof Sexp) -> Boolean)
+    list-matches?
+
     ;; Useful for debugging.
     ;; (-> String)
     to-string))
@@ -61,13 +98,18 @@
     ;; Note that this is distinct from the concept of is-used?; a rule
     ;; can be in `unused` here even its `is-used?` returns true.
     (define unused #f)
+    ;; Those rules which are terminals--i.e., have recursivity 0
+    (define simple-rules #f)
+    ;; Used to cycle between simple rules
+    (define simple-index 0)
 
     (define/public (recursivity) 1)
 
     ;; Initializes the top-level rules and marks them as unused.
     (define/public (set-rules the-rules)
       (set! rules the-rules)
-      (set! unused (apply mutable-set rules)))
+      (set! unused (apply mutable-set rules))
+      (set! simple-rules (filter (λ (rule) (= 0 (send rule recursivity))) rules)))
 
     ;; Returns a usage of one of the top-level rules. Which one is chosen
     ;; is determined by a fairly complicated process. Basically, if `last?`
@@ -94,11 +136,28 @@
     (define/public (is-used?)
       (set-empty? unused))
 
-   (define/public (to-string)
-      "PYHM")))
+    (define (get-simple-rule)
+      (define simple-rule (list-ref simple-rules simple-index))
+      (set! simple-index (modulo (+ simple-index 1) (length simple-rules)))
+      simple-rule)
+
+    ;; Returns a simple usage of a terminal
+    (define/public (get-simple-usage)
+      (rho (send (get-simple-rule) get-simple-usage)))
+
+    ;; Returns a bad usage of a terminal
+    (define/public (get-bad-usages)
+      (map rho (send (get-simple-rule) get-bad-usages)))
+
+    ;; A recursive term could've produced an expr if any of the rules could've
+    (define/public (list-matches? list-sexp)
+      (ormap (λ (rule) (send rule list-matches? list-sexp)) rules))
+
+    (define/public (to-string)
+      "expr")))
 
 ;; Represents a list in the grammar, for instance, {+ expr expr}, which has
-;; subterms `+` (a literal), expr and expr (both recursive). 
+;; subterms `+` (a literal), expr and expr (both recursive)
 (define List%
   (class* object% (Rule<%>)
     (init subterms)
@@ -131,6 +190,48 @@
     (define/public (is-used?)
       (andmap (λ (sub) (send sub is-used?)) subs))
 
+    ;; Get a simple usage of each of the subterms
+    (define (get-simple-usages rules)
+      (map (λ (term) (send term get-simple-usage)) rules))
+
+    ;; A simple usage of a list is a list of simple usages of each item
+    (define/public (get-simple-usage)
+      (get-simple-usages subs))
+
+    ;; Creates several bad usages of the list based on some heuristics
+    (define/public (get-bad-usages)
+      ;; First, make some bad expressions by making one of subterms bad
+      ;; while keeping the others simple. Do this for each subterm.
+      (define one-elem-is-bad
+        (append-map
+         (λ (i)
+           (define z (send (list-ref subs i) get-bad-usages))
+           (map
+            (λ (bad)
+              (map
+               (λ (j) (if (= i j) bad (send (list-ref subs j) get-simple-usage)))
+               (range (length subs))))
+            z))
+         (range (length subs))))
+      ;; Next, make some bad expressions by making the list too short
+      (define too-short
+        (cons empty (map get-simple-usages (prefixes subs))))
+      ;; Make the list too long
+      (define too-long
+        (map get-simple-usages (append-many (last subs) 3 subs)))
+      (append one-elem-is-bad too-short too-long))
+
+    ;; Note that the list-sexp must have only one element, since this rule
+    ;; always produces exactly one list. We can't just check to make sure
+    ;; each term in the list inside list-sexp is matched by the corresponding
+    ;; term in subs, since variadic terms can produce 0 or many terms.
+    ;; `list-list-matches?` actually does all the heavy lifting here.
+    (define/public (list-matches? list-sexp)
+      (match list-sexp
+        [(cons (? list? l) '())
+         (list-list-matches? empty l subs)]
+        [else false]))
+
     (define/public (to-string)
       (~a (map (λ (sub) (send sub to-string)) subs)))))
 
@@ -143,13 +244,21 @@
 ;; to appear in every recursive spot.
 (define Literal%
   (class* object% (Rule<%>)
-    (init the-examples)
+    (init the-examples bad-examples predicate)
     (define examples the-examples)
+    (define bads bad-examples)
+    (define pred predicate)
+
+    ;; Verify that the predicate is consistent with the given good and bad examples
+    (when (or (ormap pred bads) (not (andmap pred examples)))
+      (error "literal examples inconsistent predicate" examples bads))
+
     (super-new)
 
     ;; Literals aren't recursive
     (define/public (recursivity) 0)
     (define index 0)
+    (define bad-index 0)
 
     (define/public (set-rules the-rules) void)
 
@@ -164,6 +273,23 @@
     ;; once guarantee that each one *will* be used at least once?)
     (define/public (is-used?) #t)
 
+    ;; Just return one of the examples of this literal
+    (define/public (get-simple-usage)
+      (get-usage false))
+
+    ;; Return one of the examples of bad literals
+    (define/public (get-bad-usages)
+      (define usage (list-ref bads bad-index))
+      (set! bad-index (modulo (+ bad-index 1) (length bads)))
+      (list usage))
+
+    ;; Make sure the list contains exactly one element (since a literal only
+    ;; produces one expression) and that the element satisfies the predicate
+    (define/public (list-matches? list-sexp)
+      (match list-sexp
+        [(cons sexp '()) (pred sexp)]
+        [else false]))
+
     (define/public (to-string)
       (~a (list-ref examples index)))))
 
@@ -177,7 +303,7 @@
     (super-new)
 
     ;; A variadic list is as recursive as the term it repeats.
-    ;; This is only *kind of* true, since any usage may have anywhere from 
+    ;; This is only *kind of* true, since any usage may have anywhere from
     ;; 0 to 4 usages of the repeated term, but if someone is relying on us
     ;; to be recursive we'll always generate at least one.
     (define/public (recursivity) (send rep recursivity))
@@ -201,7 +327,22 @@
     ;; Is our subterm itself used up?
     (define/public (is-used?) (send rep is-used?))
 
-   (define/public (to-string)
+    ;; Returns just one simple usage of the subterm
+    (define/public (get-simple-usage)
+      (v (list (send rep get-simple-usage))))
+
+    ;; Returns the bad usages of the subeterms. To be simple, the variadic
+    ;; list will be of length one.
+    (define/public (get-bad-usages)
+      (map v (map list (send rep get-bad-usages))))
+
+    ;; This is the only rule that matches `list-sexp`s of non-unit lengths.
+    ;; Each term in list-sexp needs to match the sub-term that this variadic
+    ;; list consists of.
+    (define/public (list-matches? list-sexp)
+      (andmap (λ (s) (send rep list-matches? (list s))) list-sexp))
+
+    (define/public (to-string)
       (string-append (send rep to-string) " ..."))))
 
 ;; A subclass of Literal. Takes in a list of explicit ids to use and
@@ -210,17 +351,21 @@
 ;; any actually valid ids.
 (define Identifier%
   (class* Literal% (Rule<%>)
-    (init ids)
+    (init ids bad-ids)
     (define default-ids '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
-    (super-new [the-examples (append ids default-ids)])))
+    (super-new [the-examples (append ids default-ids)]
+               [bad-examples bad-ids]
+               [predicate (λ (sexp) (and (symbol? sexp) (not (member sexp bad-ids))))])))
 
 ;; Passes the rules down into themselves, so the recursive terms know what the
 ;; rules are.
+;; ((Listof Rule<%>) -> void)
 (define (set-rules rules)
   (for ([rule rules])
     (send rule set-rules rules)))
 
 ;; Splices lists wrapped in `v` into their surroundings
+;; (rho -> rho)
 (define (splice-v r)
   (match r
     [(rho e) (rho (splice-v e))]
@@ -228,12 +373,14 @@
     [else r]))
 
 ;; Helper for splice-v
+;; (rho -> (Listof rho))
 (define (children x)
   (match x
     [(v l) l]
     [else (list x)]))
 
 ;; Take a guess what this does
+;; (Boolean -> Integer)
 (define (bool->int b)
   (match b
     [#t 1]
@@ -242,6 +389,7 @@
 
 ;; Compares two lists lexicographically, comparing first the heads of the lists,
 ;; and then comparing the rest of the lists if the heads are equal.
+;;> ((Listof Integer) (Listof Integer) -> Boolean)
 (define (crit> crit1 crit2)
   (match* (crit1 crit2)
     [((cons f1 r1) (cons f2 r2))
@@ -249,3 +397,42 @@
          (crit> r1 r2)
          (> f1 f2))]
     [(_ _) #f]))
+
+;; Returns a list of each nonempty prefix of `elems`
+;; ((Listof 'a) -> (Listof (Listof 'a))
+(define (prefixes elems)
+  (match elems
+    ['() empty]
+    [(cons f r)
+     (cons (list f) (map (λ (x) (cons f x)) (prefixes r)))]))
+
+;; Returns `elems`, but with `elem` appended 0, 1, 2, ..., `num` times.
+;; ('a Integer (Listof 'a) -> (Listof (Listof 'a)))
+(define (append-many elem num elems)
+  (if (zero? num)
+      (list elems)
+      (cons elems (map (λ (l) (append l (list elem))) (append-many elem (- num 1) elems)))))
+
+;; Removes duplicates from the list. `seen` is a helper; pass empty.
+;; ((Listof 'a) (Listof 'a) -> (Listof 'a))
+(define (dedupe l seen)
+  (match l
+    [(cons f r)
+     (if (member f seen) (dedupe r seen) (cons f (dedupe r (cons f seen))))]
+    ['() '()]))
+
+;; This one's pretty gnarly. Basically, it sees whether the expressions in `sexp`
+;; could have been produced by the rules in `subs`. `begin` is a helper; pass empty.
+;; Variadic rules are what make this complicated--we need to try giving each rule
+;; lists of expressions of varying lengths because variadic rules can produce
+;; many expression at once.
+;; ((Listof Sexp) (Listof Sexp) (Listof Rule<%>) -> Boolean)
+(define (list-list-matches? begin sexp subs)
+  (match* (sexp subs)
+    [('() '()) true]
+    [(_ '()) false]
+    [(_ (cons f r))
+     (or (and (send f list-matches? begin)
+              (list-list-matches? empty sexp r))
+         (and (not (empty? sexp))
+              (list-list-matches? (append begin (list (first sexp))) (rest sexp) subs)))]))
