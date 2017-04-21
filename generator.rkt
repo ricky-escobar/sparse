@@ -6,7 +6,7 @@
 ;; Maybe I could have just used `values` somehow?
 (struct v (l) #:transparent)
 
-(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase generate-bad-testcases rho rho->sexp)
+(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase generate-bad-testcases rho rho->sexp dedupe)
 
 ;; The main function of this module. Takes in a list of Rule<%>s and
 ;; produces an expression that matches the grammar described by the rules

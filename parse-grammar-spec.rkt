@@ -66,7 +66,7 @@
     [(list '... term)
      (new Variadic% [repeated-term ((parse-rule expr ids bad-ids) term)])]
     [(list 'U terms ...)
-     (new Literal% [the-examples terms] [bad-examples bad-ids] [predicate (λ (x) true)])]
+     (new Literal% [the-examples terms] [bad-examples (dedupe bad-ids terms)] [predicate (λ (x) (member x terms))])]
     [(list 'id other-ids ...)
      (new Identifier% [ids (append other-ids ids)] [bad-ids bad-ids])]
     [(list 'number terms ...)
