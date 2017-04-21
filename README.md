@@ -5,18 +5,18 @@ The idea is to take in a description of the syntax of the language that the stud
 For example, given the EBNF-like grammar:
 ```
 `[[true false + - * / eq? <= substring]
-    [lam new send = var rec if]
-    [expr
-     {if expr expr expr}
-     {expr expr ...}
-     {var {[id] = expr} ... expr}
-     {lam {[id] ...} expr}
-     {new [id] expr ...}
-     {send expr expr expr ...}
-     {rec {[id] = expr} expr}
-     [id this]
-     [string "Hello" "World" ""]
-     [number 0 1 -1 2.2 -22/7]]]
+  [lam new send = var rec if]
+  [expr
+   {if expr expr expr}
+   {expr expr ...}
+   {var {[id] = expr} ... expr}
+   {lam {[id] ...} expr}
+   {new [id] expr ...}
+   {send expr expr expr ...}
+   {rec {[id] = expr} expr}
+   [id this]
+   [string "Hello" "World" ""]
+   [number 0 1 -1 2.2 -22/7]]]
 ```
          
  the following testcase is generated:
