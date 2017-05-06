@@ -22,7 +22,7 @@
     (func (preprocess arg))))
 
 ;; Tests the submissions in dir with the grammar
-(define (run-tests dir func-to-test grammar preprocess)
+(define (run-tests dir func-to-test grammar preprocess lang-name)
   (define old-dir (current-directory))
   (current-directory dir)
   (define out (open-output-file "results2.txt" #:mode 'text #:exists 'truncate))
@@ -45,7 +45,7 @@
             (define parse (dynamic-require (build-path dir "text1.rkt") func-to-test))
             (define msg (sexps->string (minimal-failures parse testcase preprocess)))
             (disp msg out)
-            (define didnt-error (filter (doesnt-error-cleanly? parse "PHYM" preprocess) bad-syntax-testcases))
+            (define didnt-error (filter (doesnt-error-cleanly? parse lang-name preprocess) bad-syntax-testcases))
             (disp " --- " out)
             (displn (sexps->string didnt-error) out)))))
 

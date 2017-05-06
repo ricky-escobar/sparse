@@ -1,0 +1,1 @@
+ls | (while read x; do (sed -n '/plai-typed/,$p' $x/text.rkt) > $x/text1.rkt; done); ls | (while read x; do grep Testfail $x/text.rkt -q  && touch $x/fail; done)
