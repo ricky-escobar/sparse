@@ -1,130 +1,109 @@
-# Testcase generation and minimization for John Clements's CPE 430
+# Sparse: Test Generation for Simple S-expression Language Parsers
 
-The idea is to take in a description of the syntax of the language that the students are implementing and produce a big testcase that makes sure that students parse valid expressions without throwing an error.
+Sparse is a tool (written in Racket) for generating test cases for parsers for simple S-expression languages. It is intended primarily for use by instructors of Programming Languages classes in which students implement a simple S-expression-based programming language. It takes as input a description of the grammar of the language to be implemented and produces test cases for the students' parsers.
 
-For example, given the EBNF-like grammar:
-```
-`[[true false + - * / eq? <= substring]
-  [lam new send = var rec if]
-  [expr
-   {if expr expr expr}
-   {expr expr ...}
-   {var {[id] = expr} ... expr}
-   {lam {[id] ...} expr}
-   {new [id] expr ...}
-   {send expr expr expr ...}
-   {rec {[id] = expr} expr}
-   [id this]
-   [string "Hello" "World" ""]
-   [number 0 1 -1 2.2 -22/7]]]
-```
-         
- the following testcase is generated:
+## Motivation
 
-```
-{if {lam {} {lam {} {new e {lam {} {{lam {} {var {d = {lam {} {rec {i = {lam {}
-{if {new d {new c {{new b {var {a = {new a {rec {h = {new substring {if {{{var
-{<= = {{rec {g = {{if {var {eq? = {var {/ = {rec {f = {var {* = {if {rec {e =
-{rec {d = {if {if {send {lam {} {send {new <= {send {{send {var {- = {send {rec
-{c = {send {if this {lam {true false + -} true} {lam {* / eq?} "Hello"}} {lam
-{<= substring} 0} {new true false} {+ {new false "World"} {"" {var {true = -}
-{new + 1}} {rec {true = *} {-1 {if "Hello" {substring {send {send / {{{{eq?
-{lam {a} {var {false = ""} {var {+ = -22/7} {rec {false = "Hello"} {var {if 0
-{var {send "World" {var <=} {var ""} {rec {+ = 1} {rec {b = -} {if + {rec {a
-= true} {send -1 {rec {- = {var 2.2}} substring} {if z {if x {send v {if u a
-{var {lam {} {var {{rec {* = {rec {/ = {rec {substring = t} {lam {} {rec {eq?
-= {if s "World" {if r 0 {send q {send p b {send {if {if {if {if {if k l {{if i
-j {rec {<= = {send {send {send f g {lam {} e}} {new eq?} 2.2} -1 "World"}} h}}}}
-m {new /}} n 1} o "Hello"} {new *} d} "" c}}}}}} {new -}}}}} -22/7}} "Hello"}}}}}}}
-w} y} this}} false}}} *}} /}}}}}}} 2.2} "World"} eq?}} <=}} a} b}} c} d e} f g}} h}
-i}} j} k}} l}} m}} n} o p} q r}} s}} t} u v}} w}} x}} y}} z} this true}}} false}}}
-{substring = +} -}}} * /}}} eq?}}} {b = <=} {c = substring} a}}} b} c d} e f}}} g}}}
-{e = h} {f = i} {g = j} k}}}} l m n}}} o p}
-```
+Producing test cases for parsers by hand is tedious and difficult to do exhaustively. In addition, it is likely that students will have to implement several different versions of the language, in which case several different sets of test cases must be maintained. Furthermore, if any changes to the language are made from term to term, the test cases must be updated--and doing so may not always be a simple find-and-replace. It would be nice to have a tool which automatically generates exhaustive test cases based solely on the language's grammar. This is exactly what Sparse does.
 
-Wow! That's a mouthful! If a student were to fail that testcase, how would they even know where to begin? It would be nice to produce a minimal failing testcase that shows more simply what the student's error is.
+## Example
 
-By dynamically calling the student's parser with narrower and narrower tests, we can do just that. For example, the above testcase yields the following minimal failures for one student:
+Consider the following grammar for a simple language (dubbed PHYM4) which has conditionals, local variable binding, lambdas, function applications, numbers, strings, and identifiers:
 
-```
-{lam {true false + -} true}
-{lam {* / eq?} "Hello"}
-{lam {<= substring} 0}
-{rec {- = x} substring}
-{rec {<= = x} h}
-```
+    Expr = {if Expr Expr Expr}
+         | {var {Id = Expr} ... Expr}
+         | {lam {Id ...} Expr}
+         | {Expr Expr ...}
+         | Number
+         | String
+         | Id
 
-## Generating syntactically-invalid testcases
+Here, `Number`, `String`, and `Id` are not to be taken literally, but rather as placeholders for literal numbers, strings, and identifiers. Additionally, `if`, `var`, `lam`, and `=` are to be forbidden as identifiers. Built-in operations, functions, and constants like `+`, `*`, `<=`, `substring`, or `true` are treated like any other identifier from the point of view of this language and so are not treated specially by the grammar.  An example program from this language is
 
-Using some of the machinery developed for generating *valid* testcases, we can also generate syntactically-*invalid* testcases to verify that students properly throw an error message for syntactically-invalid programs. Here are the testcases generated for the above grammar:
+`{{lam {x y} {if {<= x y} x y}} 5 4}`,
 
-```
-{lam q r s}
-{if lam "" "Hello"}
-{if -22/7 lam 0}
-{if t u lam}
-{}
-{if}
-{if "World"}
-{if 1 ""}
-{if -22/7 "" x "Hello"}
-{if y 0 1 z "World"}
-{if "" this -1 true "Hello" 2.2}
-{"World" new}
-{lam {h = substring} a}
-{var {lam = "World"} "Hello"}
-{var {i lam 0} 0}
-{var {j = send} e}
-{var {} "World"}
-{var {k} 1}
-{var {l =} f}
-{var {o = b "Hello"} g}
-{var {p = -1 c "World"} "Hello"}
-{var {q = 2.2 d "" -22/7} 2.2}
-{var {r = h} =}
-{var}
-{var {s = "World"}}
-{var {v = "Hello"} j "World"}
-{var {w = 1} -1 k ""}
-{var {x = l} 2.2 m "Hello" -22/7}
-{new {b} n}
-{lam {lam} "World"}
-{lam {n} new}
-{lam}
-{lam {o}}
-{lam {r} -1 r}
-{lam {s} "" 2.2 s}
-{lam {t} "Hello" -22/7 t "World"}
-{lam f u} {new lam ""}
-{new g send}
-{new}
-{lam z this true}
-{send send "World" ""}
-{send 2.2 = -22/7}
-{send false + var}
-{send}
-{send "Hello"}
-{lam {j = b} c}
-{rec {lam = "Hello"} ""}
-{rec {k lam 2.2} 2.2}
-{rec {l = rec} g}
-{rec {} "Hello"}
-{rec {m} -22/7}
-{rec {n =} h}
-{rec {q = d ""} i}
-{rec {r = 0 e "Hello"} ""}
-{rec {s = 1 f "World" -1} 1}
-{rec {t = j} if}
-{rec}
-{rec {u = "Hello"}}
-{rec {x = ""} l "Hello"}
-{rec {y = -22/7} 0 m "World"}
-{rec {z = n} 1 o "" -1}
-lam
-=
-var
-```
+which introduces a function to determine the minimum of two numbers, and then applies it to 5 and 4. Note, that we use braces as delimiters instead of parentheses to distinguish this tiny language from Racket. This language is very simple, and yet writing a suite of input programs to test students' parsers would be tedious--and would likely fail to be comprehensive.
 
-## What's next?
+Sparse takes as input a description of the grammar which is not unlike the grammar shown above. It is worth noting here the largest limitation of Sparse. Sparse's input grammar may only have one nonterminal. In this example, this is `Expr`. For languages whose grammars have more than one nonterminal, this can be worked around by only generating test cases for the core expression grammar, which is more likely to be able to be expressed as a grammar with one nonterminal, and leaving the full language to be tested with manually-written tests.
 
-The above tests should test students' parsers pretty thoroughly. Next, we can try to generate testcases for their interpreter. The main challenge associated with this is that, in order to generate good *semantically-valid* testcases, we must of knowledge of language's type system and how it binds identifiers.
+    (define phym4-grammar
+      '([true false null + - * / eq? <= substring array new-array aref aset! begin]
+        [lam = var if]
+        [Expr
+         {if Expr Expr Expr}
+         {Expr Expr ...}
+         {var {[id] = Expr} ... Expr}
+         {lam {[id] ...} Expr}
+         [id]
+         [string "Hello" "World" ""]
+         [number 0 1 -1 2.2 -22/7]]))
+
+The details of the format of the input grammar are described below. Using this grammar, one can call `generate-valid-testcase` to generate one large test case which will test to make sure the student's parser accepts all valid programs. The following is produced for the grammar defined above:
+
+    {if {lam {} {lam {} {{lam {} {var {substring = {lam {} {if {{{var {/ = {{if {var {- =
+     {var {+ = {if {if true {lam {true false null +} false} {lam {- * /} "Hello"}} {null
+     {lam {eq? <=} 0} {"World" {var {true = +} {1 {if "" {var {false = "Hello"} {var {null
+     = -1} {if 2.2 {if {var ""} - {{{{var /} -22/7} "World"} *}} {var 0}}}} {if {var {lam
+     {substring} {if {if <= substring -1} 1 "World"}}} "Hello" eq?}} array}} new-array aref}
+     aset! begin} a}} b}} {* = c} d} e f}}} {eq? = g} {<= = h} i}}} j k}}} {array = l}
+     {new-array = m} {aref = n} o}}}}} p q}
+
+Additionally, one can call `generate-invalid-testcases` to generate a list of test cases which do *not* conform to the grammar to make sure that the student's parser rejects all invalid programs. The following are produced for the grammar defined above.
+
+`{lam true false null}` `{if lam "Hello" "World"}` `{if 0 lam 1}` `{if + - lam}` `{}` `{if}` `{if ""}` `{if -1 "Hello"}` `{if 0 "Hello" eq? "World"}` `{if <= 1 -1 substring ""}` `{if "Hello" array 2.2 new-array "World" -22/7}` `{= aref}` `{"" =}` `{lam {true = e} f}` `{var {lam = ""} "World"}` `{var {false lam 1} 1}` `{var {null = var} j}` `{var {} ""}` `{var {+} -1}` `{var {- =} k}` `{var {eq? = g "World"} l}` `{var {<= = 2.2 h ""} "World"}` `{var {substring = -22/7 i "Hello" 0} -22/7}` `{var {array = m} if}` `{var}` `{var {new-array = ""}}` `{var {begin = "World"} o ""}` `{var {a = -1} 2.2 p "Hello"}` `{var {b = q} -22/7 r "World" 0}` `{= {true} s}` `{lam {lam} ""}` `{lam {aref} =}` `{lam}` `{lam {aset!}}` `{lam {b} 2.2 w}` `{lam {c} "Hello" -22/7 x}` `{lam {d} "World" 0 y ""}` `lam` `var`
+
+Since the "valid" test case produced is so large, it would likely not be very enlightening to a student trying to understand where exactly their parser is failing. To help alleviate this, Sparse includes a utility for producing minimal failing test cases for a student's parser. For example, for one student's parser, the following minimal failing test cases were identified:
+
+`{lam {true false null +} false}` `{lam {- * /} "Hello"}` `{lam {eq? <=} 1}` `{lam {array} 0}` `{var {false = "World"} x}` `{var {+ = 0} x}`
+
+Here, the student's mistake was forbidding the built-ins as parameter names; the language's grammar and semantics allow redefining the names. It is worth noting that this student had actually passed all of the instructor's original test cases. Since the instructor's test cases only tried redefining a built-in once, a student whose submission was rejected the first time could simply special-case that one built-in and resubmit their assignment successfully. Manually writing test cases which redefine each built-in is rather tedious and requires a fair bit of foresight on the part of the instructor to know that that is an area where students might mistakes. By automating the generation of test cases, we can both reduce the tedium of writing test cases and make the test suite more comprehensive.
+
+## Usage
+
+Sparse exposes five functions: `generate-valid-testcase`, `generate-invalid-testcases`, `generate-valid-testcase-for-minimization`, `produce-minimum-failing-testcases`, and `strip-minimization-info`.
+
+The first three of these functions take an S-expression representing the grammar for which to generate test cases. Consider the example grammar from before:
+
+    (define phym4-grammar
+      ;; The first list is for any legal identifiers you want Sparse to use explicitly.
+      ;; This can be useful if you think students might forbid identifiers that are legal.
+      '([true false null + - * / eq? <= substring array new-array aref aset! begin]
+        ;; The second list is for the symbols that are not legal identifiers
+        [lam = var if]
+        ;; The third list is for the production rules of the grammar. The first element
+        ;; should be a symbol for the grammar's nonterminal.
+        ;; Unfortunately, Sparse does not support more than one nonterminal.
+        [Expr
+         ;; The production rules. Any numbers and symbols other than the name of
+         ;; nonterminal are treated as literals.
+         {if Expr Expr Expr}
+         ;; '...' means that the term immediately to the left may appear zero or more times.
+         {Expr Expr ...}
+         ;; [id] (or (id) or {id}) refers to valid identifiers. This will use the
+         ;; identifiers provided above, as well as the letters of the alphabet a-z.
+         {var {[id] = Expr} ... Expr}
+         {lam {[id] ...} Expr}
+         [id]
+         ;; This represents any string. At least one example string to use must be provided.
+         [string "Hello" "World" ""]
+         ;; This represents any number. At least one example number to use must be provided
+         [number 0 1 -1 2.2 -22/7]]))
+
+### `generate-valid-testcase`
+
+`(generate-valid-testcase grammar)`. Using the grammar, produces one large S-expression which conforms to the grammar and is comprehensive in the following sense: each different production rule in the grammar will be used in place of each instance of a nonterminal in each production rule. For example, using the above grammar, the produced S-expression is guaranteed to have a subexpression like `{if _ {var {_ = _} _} _}`. A `var` expression is guaranteed to appear in each of the three subexpressions of an `if` expression. Likewise, each different 'type' of expression is guaranteed to appear in each spot where a subexpression is allowed. This process is deterministic; there's no point in generating multiple expressions from the same grammar.
+
+### `generate-invalid-testcases`
+
+`(generate-invalid-testcases grammar)`. Using the grammar, produces a list of simple S-expressions which do not conform to the grammar. The produced S-expressions are typically invalid because they use illegal identifiers or because they have incorrect lengths of lists. For instance, the above grammar will produce expressions that use `lam` in places where `lam` is not allowed, and will create `if` expressions that don't have exactly three subexpressions.
+
+### `generate-valid-testcase-for-minimization`
+`(generate-valid-testcase-for-minimization grammar)`. Produces an expression just like `generate-valid-testcase`, but that is additionally annotated with information that lets the test case minimization know which parts of the S-expression it is allowed to recurse into. Use `strip-minimization-info` to remove this information and get a pure S-expression.
+
+### `produce-minimum-failing-testcases`
+
+`(produce-minimum-failing-testcases testcase parse-function-to-test preprocess)`. Given a test case generated by `generate-valid-testcase-for-minimization` and a student's parse function, produces a list of "minimal" test cases on which the student's parser fails (i.e., throws an exception). The list of test cases is not exhaustive in the sense that there might be expressions on which the parser fails that won't be in the list until other expressions in the list have successfully parsed. The list of expressions will only be empty if the student's parser successfully parses the whole, large test case. If you find that the minimization takes longer than you would like, you might instruct your students to memoize their parse function. The `preprocess` argument is applied to any expression before it is passed to the student's parser. This is useful if, for instance, the language in question has a top-level construct around which expressions must be wrapped.
+
+### `strip-minimization-info`
+
+`(strip-minimization-info minimization-testcase)`. Strips the annotations from the return values of `generate-valid-testcase-for-minimization` to give a pure S-expression. `(strip-minimization-info (generate-valid-testcase-for-minimization grammar))` will produce the same value as `(generate-valid-testcase grammar)`.
