@@ -4,6 +4,8 @@
 (require "parse-grammar-spec.rkt")
 (require "minimization.rkt")
 
+(provide (all-defined-out))
+
 ;; (Sexp -> Sexp)
 (define (generate-valid-testcase grammar)
   (rho->sexp (generate-testcase (parse-grammar-spec grammar))))
