@@ -1,1 +1,0 @@
-ls | (while read x; do (sed -n '/racket/,$p' $x/text.rkt; echo '(provide (all-defined-out))') > $x/text1.rkt; done); ls | (while read x; do grep Testfail $x/text.rkt -q  && touch $x/fail; done)

@@ -5,37 +5,13 @@
 
 (provide parse-grammar-spec)
 
-(define test-grammar
-  ;; These top-level functions shouldn't be forbidden; so use them explicitly
-  `([true false + - * / eq? <= substring]
-    ;; Invalid ids
-    [lam new send = var rec if]
-    ;; Call the recursive rule `expr`
-    [expr
-     {if expr expr expr}
-     ;; Wow! that `...` looks so natural!
-     {expr expr ...}
-     ;; Note id is wrapped in brackets 
-     {with {[id] = expr} ... expr}
-     {lam {[id] ...} expr}
-     {new [id] expr ...}
-     {send expr expr expr ...}
-     {rec {[id] = expr} expr}
-     ;; After `id` we provide `this`, since it's a valid id in this context
-     ;; but isn't a valid param name.
-     [id this]
-     ;; Some example strings to use
-     [string "Hello" "World" ""]
-     ;; Some example numbers to use
-     [number 0 1 -1 2.2 -22/7]]))
-
 ;; Parses a grammar specification like the one above into the form expected by
 ;; generate-testcase. `s` should be a list with three elements. The first is a
 ;; list of identifiers to explicitly add to the testcase. The second is forbidden
 ;; identifiers. The third is the actual grammar. The first element of
 ;; the actual grammar is the name of the recursive rule, e.g., `expr`.
 ;; The rest are the rules of the grammar.
-;; The forms [id ids ...], [number nums ...], [string strings ...] are specia
+;; The forms [id ids ...], [number nums ...], [string strings ...] are special
 ;; and denote an identifier/number/string with explicit examples to use.
 ;; The form [U literals ...] is also special and denotes a literal with
 ;; mutliple examples.

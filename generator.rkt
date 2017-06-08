@@ -18,7 +18,9 @@
 ;; ((Listof Rule<%>) -> rho)
 (define (generate-testcase rules)
   (set-rules rules)
-  (splice-v (rho (send (first rules) get-usage #t))))
+  (splice-v (rho (send
+                  (first (sort rules > #:key (λ (rule) (send rule recursivity))))
+                  get-usage #t))))
 
 ;; Removes all those pesky rhos since the students don't expect them
 ;; (rho -> Sexp)
@@ -251,7 +253,7 @@
 
     ;; Verify that the predicate is consistent with the given good and bad examples
     (when (or (ormap pred bads) (not (andmap pred examples)))
-      (error "literal examples inconsistent predicate" examples bads))
+      (error "literal examples are inconsistent with predicate." examples bads))
 
     (super-new)
 
