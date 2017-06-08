@@ -62,7 +62,7 @@ Here, the student's mistake was forbidding the built-ins as parameter names; the
 
 Sparse exposes five functions: `generate-valid-testcase`, `generate-invalid-testcases`, `generate-valid-testcase-for-minimization`, `produce-minimum-failing-testcases`, and `strip-minimization-info`.
 
-The first three of these functions take an S-expression representing the grammar for which to generate test cases. Consider the example grammar from before:
+The first three of these functions take an S-expression representing the grammar for which to generate test cases. Several examples are provided in `example-grammars.rkt` Consider the example grammar from before:
 
     (define phym4-grammar
       ;; The first list is for any legal identifiers you want Sparse to use explicitly.
