@@ -1,7 +1,6 @@
 #lang racket
 
 (require "generator.rkt")
-(require rackunit)
 
 (provide parse-grammar-spec)
 
