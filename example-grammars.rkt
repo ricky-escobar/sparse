@@ -196,6 +196,22 @@
      [number 1 -1 2.2 -22/7]
      0]])
 
+(define uire3-grammar
+  `[[]
+    [true false var if lam + - * / equal? <=]
+    [expr
+     {if expr expr expr}
+     {expr expr ...}
+     {var {[id] = expr} ... expr}
+     {lam {[id] ...} expr}
+     {[U + - * equal? <=] expr expr}
+     {/ expr expr}
+     [id]
+     true
+     false
+     [number 1 -1 2.2 -22/7]
+     0]])
+
 (define phym2-grammar
   `[[]
     [+ - * / ifleq0]
