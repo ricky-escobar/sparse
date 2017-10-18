@@ -22,6 +22,10 @@
 (define (produce-minimum-failing-testcases minimization-testcase parse-function-to-test preprocess)
   (map preprocess (minimal-failures parse-function-to-test minimization-testcase preprocess)))
 
+;; (Sexp Sexp -> Boolean)
+(define (conforms-to-grammar? grammar expression)
+  (conforms-to-rules? (parse-grammar-spec grammar) expression))
+
 ;; (AnnotatedSexp -> Sexp)
 (define (strip-minimization-info minimization-testcase)
   (rho->sexp minimization-testcase))

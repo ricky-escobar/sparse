@@ -6,7 +6,7 @@
 ;; Maybe I could have just used `values` somehow?
 (struct v (l) #:transparent)
 
-(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase generate-bad-testcases rho rho->sexp dedupe)
+(provide Rule<%> Recursive% List% Literal% Identifier% Variadic% generate-testcase generate-bad-testcases rho rho->sexp dedupe conforms-to-rules?)
 
 ;; The main function of this module. Takes in a list of Rule<%>s and
 ;; produces an expression that matches the grammar described by the rules
@@ -36,13 +36,25 @@
 ;; ((Listof Rule<%>) -> (Listof Sexp)
 (define (generate-bad-testcases rules)
   (set-rules rules)
-  (filter (λ (sexp) (not (ormap (λ (rule) (send rule list-matches? (list sexp))) rules)))
+  (filter (negate (curry conforms-to-set-rules? rules))
           (dedupe (map rho->sexp
                        (map splice-v
                             (map rho
                                  (append-map (λ (rule) (send rule get-bad-usages))
                                              rules))))
                   empty)))
+
+;; Determines whether the expression matches any of the rules.
+;; ((Listof Rule<%>) Sexp -> Boolean)
+(define (conforms-to-rules? rules sexp)
+  (set-rules rules)
+  (conforms-to-set-rules? rules sexp))
+
+;; Determines whether the expression matches any of the rules.
+;; The rules should have already had their subrules set.
+;; ((Listof Rule<%>) Sexp -> Boolean)
+(define (conforms-to-set-rules? rules sexp)
+  (ormap (λ (rule) (send rule list-matches? (list sexp))) rules))
 
 ;; The main interface which represents a single line in the EBNF-like grammar.
 (define Rule<%>

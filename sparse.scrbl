@@ -186,13 +186,14 @@ cases and make the test suite more comprehensive.
 
 @subsection{Usage}
 
-@defmodule[sparse]{Sparse exposes five functions:
+@defmodule[sparse]{Sparse exposes six functions:
  @racket[generate-valid-testcase], @racket[generate-invalid-testcases],
  @racket[generate-valid-testcase-for-minimization],
+ @racket[conforms-to-grammar?]
  @racket[produce-minimum-failing-testcases], and
  @racket[strip-minimization-info].}
 
-The first three of these functions take an S-expression
+The first four of these functions take an S-expression
 representing the grammar for which to generate test cases.
 Several examples are provided in `example-grammars.rkt`
 Consider the example grammar from before:
@@ -256,6 +257,12 @@ Consider the example grammar from before:
  S-expression it is allowed to recurse into. Use
  @racket[strip-minimization-info] to remove this information and get
  a pure S-expression.}
+
+@defproc[(conforms-to-grammar? [grammar grammar?] [expression sexp?]) boolean?]{
+ Checks whether the expression conforms the grammar specified.
+ This will return @racket[true] for the return value of
+ @racket[generate-valid-testcase] and @racket[false] for
+ all of the return values of @racket[generate-invalid-testcases].}
 
 @defproc[(produce-minimum-failing-testcases
           [test-case s-expression?]

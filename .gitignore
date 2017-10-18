@@ -1,6 +1,11 @@
 *.bak
 old*
+*results.txt
+test.rkt
 .idea
 compiled
 temp*
 *~
+*.html
+*.css
+*.js

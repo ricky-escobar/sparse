@@ -60,7 +60,7 @@ Here, the student's mistake was forbidding the built-ins as parameter names; the
 
 ## Usage
 
-Sparse exposes five functions: `generate-valid-testcase`, `generate-invalid-testcases`, `generate-valid-testcase-for-minimization`, `produce-minimum-failing-testcases`, and `strip-minimization-info`.
+Sparse exposes six functions: `generate-valid-testcase`, `generate-invalid-testcases`, `generate-valid-testcase-for-minimization`, `conforms-to-grammar?`, `produce-minimum-failing-testcases`, and `strip-minimization-info`.
 
 The first three of these functions take an S-expression representing the grammar for which to generate test cases. Several examples are provided in `example-grammars.rkt` Consider the example grammar from before:
 
@@ -99,6 +99,10 @@ The first three of these functions take an S-expression representing the grammar
 
 ### `generate-valid-testcase-for-minimization`
 `(generate-valid-testcase-for-minimization grammar)`. Produces an expression just like `generate-valid-testcase`, but that is additionally annotated with information that lets the test case minimization know which parts of the S-expression it is allowed to recurse into. Use `strip-minimization-info` to remove this information and get a pure S-expression.
+
+### `conforms-to-grammar?`
+
+`(conforms-to-grammar grammar expression)`. Checks whether the expression conforms the grammar specified. This will return `true` for the return value of `generate-valid-testcase` and `false` for all of the return values of `generate-invalid-testcases`.
 
 ### `produce-minimum-failing-testcases`
 
