@@ -68,6 +68,19 @@
      [string "Hello" "World" ""]
      [number 0 1 -1 2.2 -22/7]]))
 
+(define uire4-grammar
+  `([true false null + - * / equal? <= substring array new-array aref aset! begin]
+    [lam = var if <-]
+    [expr
+     {if expr expr expr}
+     {expr expr ...}
+     {var {[id] = expr} ... expr}
+     {lam {[id] ...} expr}
+     {[id] <- expr}
+     [id]
+     [string "Hello" "World" ""]
+     [number 0 1 -1 2.2 -22/7]]))
+
 (define phym4-grammar
   `([true false null + - * / eq? <= substring array new-array aref aset! begin]
     [lam = var if]
